@@ -2,6 +2,9 @@ from flask import Flask
 from .config import settings
 from .extensions import db, migrate, bcrypt
 
+# blueprint
+from .api.auth_routes import auth_bp
+
 def create_app():
     app = Flask(__name__)
     app.config['SECRET_KEY'] = settings.SECRET_KEY
@@ -13,8 +16,7 @@ def create_app():
     migrate.init_app(app, db)
     bcrypt.init_app(app)
 
-    # Here is where you will register Blueprints (routes) later
-    # from .api import auth_routes
-    # app.register_blueprint(auth_routes.bp)
+    # Register the blueprint with the app
+    app.register_blueprint(auth_bp)
 
     return app
