@@ -4,6 +4,7 @@ from app.models import Loan, BookCopy, User
 from app.core.exceptions import ConcurrencyException, BookNotAvailableException
 from sqlalchemy.orm import joinedload
 from app.models import Book
+from app.tasks import send_loan_confirmation_email
 
 def create_loan(user: User, book_copy_id: int):
     book_copy = BookCopy.query.get(book_copy_id)
@@ -36,6 +37,13 @@ def create_loan(user: User, book_copy_id: int):
 
         db.session.add(new_loan)
         db.session.commit()
+
+        # Trigger the async task. .delay() sends it to the Celery worker
+        # instead of running it immediately. The API can return a response
+        # to the user instantly while this task runs in the background.
+        send_loan_confirmation_email.delay(new_loan.id)
+
+        
         return new_loan
 
     except Exception as e:
