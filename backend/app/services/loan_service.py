@@ -2,6 +2,8 @@ import datetime
 from app.extensions import db
 from app.models import Loan, BookCopy, User
 from app.core.exceptions import ConcurrencyException, BookNotAvailableException
+from sqlalchemy.orm import joinedload
+from app.models import Book
 
 def create_loan(user: User, book_copy_id: int):
     book_copy = BookCopy.query.get(book_copy_id)
@@ -40,3 +42,13 @@ def create_loan(user: User, book_copy_id: int):
         db.session.rollback()
         # Re-raise the exception to be handled by the route
         raise e
+
+
+def get_user_loans(user_id: int):
+    # This query fetches all loans for a user.
+    # joinedload is an "eager loading" strategy. It tells SQLAlchemy to
+    # fetch the related BookCopy and Book data in the same initial query
+    # using a JOIN, which is much more efficient than loading them later.
+    return Loan.query.options(
+        joinedload(Loan.book_copy).joinedload(BookCopy.book)
+    ).filter(Loan.user_id == user_id).order_by(Loan.loan_date.desc()).all()
