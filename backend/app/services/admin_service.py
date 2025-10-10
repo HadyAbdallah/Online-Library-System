@@ -4,45 +4,49 @@ from app.schemas.admin_schemas import BookCreate, BookUpdate
 from app.core.redis_client import redis_client
 from sqlalchemy.exc import IntegrityError
 import datetime
+from app.core import file_handler 
 
-def create_book(book_data: BookCreate):
+def create_book(book_data: BookCreate, image_file=None):
     new_book = Book(
         title=book_data.title,
         author=book_data.author,
         isbn=book_data.isbn,
         publication_year=book_data.publication_year,
-        description=book_data.description,
-        image_url=book_data.image_url
+        description=book_data.description
     )
     if book_data.category_ids:
         categories = Category.query.filter(Category.id.in_(book_data.category_ids)).all()
         new_book.categories.extend(categories)
 
     db.session.add(new_book)
-
     try:
         db.session.commit()
     except IntegrityError:
-        # Important: roll back the session to a clean state
         db.session.rollback()
-        # Raise a more specific, user-friendly error
         raise ValueError(f"A book with ISBN {book_data.isbn} already exists.")
 
+    if image_file:
+        image_url = file_handler.save_book_image(image_file)
+        new_book.image_url = image_url
+        db.session.commit()
 
     return new_book
 
-def update_book(book_id: int, book_data: BookUpdate):
+def update_book(book_id: int, book_data: BookUpdate, image_file=None):
     book = Book.query.get(book_id)
     if not book:
         return None
 
-    # Update fields from the Pydantic model
     for key, value in book_data.model_dump(exclude_unset=True).items():
         if key == "category_ids":
             categories = Category.query.filter(Category.id.in_(value)).all()
             book.categories = categories
         else:
             setattr(book, key, value)
+
+    if image_file:
+        image_url = file_handler.save_book_image(image_file)
+        book.image_url = image_url
 
     try:
         db.session.commit()

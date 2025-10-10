@@ -1,3 +1,4 @@
+import os
 from flask import Flask
 from .config import settings
 from .extensions import db, migrate, bcrypt
@@ -15,6 +16,19 @@ def create_app():
     app.config['SECRET_KEY'] = settings.SECRET_KEY
     app.config['SQLALCHEMY_DATABASE_URI'] = settings.DATABASE_URL
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+    # Ensure the instance and upload folders exist
+    try:
+        os.makedirs(app.instance_path)
+    except OSError:
+        pass
+
+    # Construct the absolute path for the upload folder and ensure it exists
+    upload_path = os.path.join(app.instance_path, settings.UPLOAD_FOLDER)
+    os.makedirs(upload_path, exist_ok=True)
+    
+    # Store the absolute path in the app's config for later use
+    app.config['UPLOAD_FOLDER'] = upload_path
 
     # Initialize extensions
     db.init_app(app)

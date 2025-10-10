@@ -22,6 +22,7 @@ class BookPublic(BaseModel):
     id: int
     title: str
     author: str
+    isbn: str
     publication_year: Optional[int] = None
     description: Optional[str] = None
     image_url: Optional[str] = None

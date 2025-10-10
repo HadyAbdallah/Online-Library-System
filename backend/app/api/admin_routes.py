@@ -11,8 +11,9 @@ admin_bp = Blueprint('admin', __name__, url_prefix='/api/admin')
 @admin_required
 def handle_create_book():
     try:
-        book_data = BookCreate(**request.json)
-        new_book = admin_service.create_book(book_data)
+        book_data = BookCreate(**request.form.to_dict())
+        image_file = request.files.get('image')
+        new_book = admin_service.create_book(book_data, image_file)
         return jsonify(BookPublic.model_validate(new_book).model_dump()), 201
     except ValidationError as e:
         return jsonify(e.errors()), 400
@@ -23,13 +24,17 @@ def handle_create_book():
 @admin_required
 def handle_update_book(book_id):
     try:
-        book_data = BookUpdate(**request.json)
-        updated_book = admin_service.update_book(book_id, book_data)
+        book_data = BookUpdate(**request.form.to_dict())
+        image_file = request.files.get('image')
+
+        updated_book = admin_service.update_book(book_id, book_data, image_file)
         if not updated_book:
             return jsonify({"error": "Book not found"}), 404
         return jsonify(BookPublic.model_validate(updated_book).model_dump()), 200
     except ValidationError as e:
         return jsonify(e.errors()), 400
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 409
 
 @admin_bp.route('/books/<int:book_id>', methods=['DELETE'])
 @admin_required

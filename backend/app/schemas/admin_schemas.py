@@ -7,7 +7,6 @@ class BookCreate(BaseModel):
     isbn: str
     publication_year: Optional[int] = None
     description: Optional[str] = None
-    image_url: Optional[str] = None
     category_ids: List[int] = []
 
 class BookUpdate(BaseModel):
@@ -16,5 +15,4 @@ class BookUpdate(BaseModel):
     isbn: Optional[str] = None
     publication_year: Optional[int] = None
     description: Optional[str] = None
-    image_url: Optional[str] = None
     category_ids: Optional[List[int]] = None
