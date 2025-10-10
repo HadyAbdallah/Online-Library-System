@@ -31,6 +31,15 @@ def handle_update_book(book_id):
     except ValidationError as e:
         return jsonify(e.errors()), 400
 
+@admin_bp.route('/books/<int:book_id>', methods=['DELETE'])
+@admin_required
+def handle_delete_book(book_id):
+    deleted_book = admin_service.delete_book(book_id)
+    if not deleted_book:
+        return jsonify({"error": "Book not found"}), 404
+
+    return jsonify({"message": f"Book '{deleted_book.title}' has been deleted."}), 200
+
 @admin_bp.route('/books/<int:book_id>/copies', methods=['POST'])
 @admin_required
 def handle_add_book_copy(book_id):
@@ -38,3 +47,13 @@ def handle_add_book_copy(book_id):
     if not new_copy:
         return jsonify({"error": "Book not found"}), 404
     return jsonify({"message": "Book copy added successfully", "copy_id": new_copy.id}), 201
+
+
+@admin_bp.route('/copies/<int:copy_id>', methods=['DELETE'])
+@admin_required
+def handle_delete_book_copy(copy_id):
+    deleted_copy = admin_service.delete_book_copy(copy_id)
+    if not deleted_copy:
+        return jsonify({"error": "Book copy not found"}), 404
+
+    return jsonify({"message": f"Book copy ID {copy_id} has been deleted."}), 200

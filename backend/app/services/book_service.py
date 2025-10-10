@@ -14,8 +14,10 @@ def get_all_books(page: int, per_page: int, search_query: str | None, category_n
         # 3. If found (cache hit), decode the JSON and return it
         return json.loads(cached_books)
 
-    # 4. If not found (cache miss), query the database as before
-    query = Book.query
+    # 4. If not found (cache miss), query the database 
+    query = Book.query.filter(Book.deleted_at.is_(None))
+
+
     if category_name:
         query = query.join(Book.categories).filter(Category.name == category_name)
     if search_query:
@@ -52,7 +54,10 @@ def get_book_by_id(book_id: int):
         return json.loads(cached_book)
 
     # 4. If not found (cache miss), query the database
-    book = Book.query.get(book_id)
+    book = Book.query.filter(
+        Book.id == book_id,
+        Book.deleted_at.is_(None)
+    ).first()
     if not book:
         return None
 
