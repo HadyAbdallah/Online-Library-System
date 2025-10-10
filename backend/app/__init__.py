@@ -6,6 +6,7 @@ from .extensions import db, migrate, bcrypt
 from .api.auth_routes import auth_bp
 from .api.book_routes import book_bp
 from .api.loan_routes import loan_bp
+from .api.admin_routes import admin_bp
 
 from . import models
 
@@ -24,5 +25,6 @@ def create_app():
     app.register_blueprint(auth_bp)
     app.register_blueprint(book_bp)
     app.register_blueprint(loan_bp)
+    app.register_blueprint(admin_bp)
 
     return app
