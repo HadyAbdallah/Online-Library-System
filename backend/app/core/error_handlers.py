@@ -1,4 +1,3 @@
-# app/core/error_handlers.py
 from flask import jsonify, current_app
 from pydantic import ValidationError
 from sqlalchemy.exc import IntegrityError

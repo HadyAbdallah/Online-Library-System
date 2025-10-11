@@ -7,6 +7,7 @@ from app.core.exceptions import (
     MissingTokenException, InvalidTokenException, ExpiredTokenException,
     AdminAccessRequiredException
 )
+from app.core.redis_client import redis_client
 
 def _get_current_user_from_token():
     """Helper function to decode token and retrieve user."""
@@ -21,9 +22,17 @@ def _get_current_user_from_token():
     token = parts[1]
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
+        jti = payload.get('jti')
+
+        if not jti or redis_client.get(f"denylist:{jti}"):
+            raise InvalidTokenException('Token has been revoked.')
+
         user = User.query.get(payload['sub'])
         if user is None:
             raise InvalidTokenException('User not found.')
+
+        g.jwt_payload = payload 
+
         return user, payload
     except jwt.ExpiredSignatureError:
         raise ExpiredTokenException('Token has expired.')

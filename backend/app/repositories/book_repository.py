@@ -1,5 +1,6 @@
 from .base_repository import BaseRepository
 from app.models import Book, Category
+from app.extensions import db
 
 class BookRepository(BaseRepository):
     def __init__(self):
