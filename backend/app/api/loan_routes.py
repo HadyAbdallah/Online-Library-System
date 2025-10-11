@@ -17,12 +17,15 @@ def borrow_book():
 
     try:
         loan_data = LoanCreate(**request.json)
-        new_loan = loan_service.create_loan(user=current_user, book_copy_id=loan_data.book_copy_id)
+        new_loan = loan_service.create_loan(
+            user=current_user,
+            loan_data=loan_data
+        )
         return jsonify(LoanPublic.model_validate(new_loan).model_dump()), 201
 
     except ValidationError as e:
         return jsonify(e.errors()), 400
-    except BookNotAvailableException as e:
+    except (BookNotAvailableException, ValueError) as e:
         return jsonify({"error": str(e)}), 404
     except ConcurrencyException as e:
         # 409 Conflict is the appropriate status code for a race condition

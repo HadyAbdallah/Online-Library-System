@@ -1,9 +1,10 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 import datetime
 
 class LoanCreate(BaseModel):
-    book_copy_id: int
+    book_id: int 
+    loan_days: int = Field(14, gt=0, le=14)
 
 class LoanPublic(BaseModel):
     id: int

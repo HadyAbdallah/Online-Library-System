@@ -1,62 +1,64 @@
 import datetime
 from app.extensions import db
-from app.models import Loan, BookCopy, User
+from app.models import Loan, BookCopy, User, Book
 from app.core.exceptions import ConcurrencyException, BookNotAvailableException
-from sqlalchemy.orm import joinedload
-from app.models import Book
 from app.tasks import send_loan_confirmation_email
+from sqlalchemy.exc import OperationalError
+from sqlalchemy.orm import joinedload
+from app.schemas.loan_schemas import LoanCreate
 
-def create_loan(user: User, book_copy_id: int):
-    book_copy = BookCopy.query.get(book_copy_id)
-
-    if not book_copy or book_copy.status != 'available':
-        raise BookNotAvailableException("This book copy is not available for loan.")
-
+def _lock_and_create_loan(user: User, book_copy_id: int, loan_days: int):
+    # Private helper function containing the core pessimistic locking logic.
+    
     try:
-        # This is the core of optimistic locking.
-        # We try to update the book copy's status and increment its version
-        # but only if the status is still 'available'.
-        # The database ensures this is an atomic operation.
-        rows_updated = db.session.query(BookCopy).filter(
-            BookCopy.id == book_copy_id,
-            BookCopy.status == 'available'
-        ).update({
-            'status': 'loaned',
-            'version': BookCopy.version + 1
-        })
+        book_copy = db.session.query(BookCopy).filter(
+            BookCopy.id == book_copy_id
+        ).with_for_update(nowait=True).first()
 
-        # If no rows were updated, it means another transaction changed the
-        # copy's status between our initial check and our update attempt.
-        if rows_updated == 0:
-            db.session.rollback()
-            raise ConcurrencyException("This book was just borrowed by someone else. Please try another copy.")
+        if not book_copy:
+            raise BookNotAvailableException("This book copy does not exist.")
+        
+        if book_copy.status != 'available':
+            raise BookNotAvailableException("This book copy is not available for loan.")
 
-        # If the update succeeded, we can create the loan record.
-        due_date = datetime.datetime.utcnow() + datetime.timedelta(weeks=2)
+        book_copy.status = 'loaned'
+        
+        due_date = datetime.datetime.utcnow() + datetime.timedelta(days=loan_days)
         new_loan = Loan(user_id=user.id, book_copy_id=book_copy_id, due_date=due_date)
 
         db.session.add(new_loan)
         db.session.commit()
 
-        # Trigger the async task. .delay() sends it to the Celery worker
-        # instead of running it immediately. The API can return a response
-        # to the user instantly while this task runs in the background.
         send_loan_confirmation_email.delay(new_loan.id)
-
         
         return new_loan
 
+    except OperationalError:
+        db.session.rollback()
+        raise ConcurrencyException("This book copy is currently being processed. Please try again in a moment.")
+    
     except Exception as e:
         db.session.rollback()
-        # Re-raise the exception to be handled by the route
         raise e
 
+def create_loan(user: User, loan_data: LoanCreate):
+
+    # Main service function. Finds an available copy for the given book_id and loans it.
+
+    available_copy = BookCopy.query.filter_by(
+        book_id=loan_data.book_id,
+        status='available',
+        deleted_at=None
+    ).first()
+
+    if not available_copy:
+        raise BookNotAvailableException("No available copies of this book were found.")
+    
+    # Call our locking helper with the found copy_id
+    return _lock_and_create_loan(user, available_copy.id, loan_data.loan_days)
 
 def get_user_loans(user_id: int):
-    # This query fetches all loans for a user.
-    # joinedload is an "eager loading" strategy. It tells SQLAlchemy to
-    # fetch the related BookCopy and Book data in the same initial query
-    # using a JOIN, which is much more efficient than loading them later.
+    # Fetches all loans for a specific user.
     return Loan.query.options(
         joinedload(Loan.book_copy).joinedload(BookCopy.book)
     ).filter(Loan.user_id == user_id).order_by(Loan.loan_date.desc()).all()
