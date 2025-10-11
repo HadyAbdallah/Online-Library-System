@@ -1,5 +1,8 @@
+"""
+Implements security features like JWT handling and authorization decorators.
+"""
 from functools import wraps
-from flask import request, g, jsonify
+from flask import request, g
 import jwt
 from app.config import settings
 from app.models import User
@@ -10,7 +13,10 @@ from app.core.exceptions import (
 from app.core.redis_client import redis_client
 
 def _get_current_user_from_token():
-    """Helper function to decode token and retrieve user."""
+    """
+    Decodes the JWT from the Authorization header, validates it,
+    and retrieves the corresponding user from the database.
+    """
     auth_header = request.headers.get('Authorization')
     if not auth_header:
         raise MissingTokenException('Authorization header is missing.')
@@ -24,6 +30,7 @@ def _get_current_user_from_token():
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
         jti = payload.get('jti')
 
+        # Check if the token has been revoked (logged out).
         if not jti or redis_client.get(f"denylist:{jti}"):
             raise InvalidTokenException('Token has been revoked.')
 
@@ -31,7 +38,8 @@ def _get_current_user_from_token():
         if user is None:
             raise InvalidTokenException('User not found.')
 
-        g.jwt_payload = payload 
+        # Attach the decoded payload to the global `g` object for potential use in the route.
+        g.jwt_payload = payload
 
         return user, payload
     except jwt.ExpiredSignatureError:
@@ -40,14 +48,16 @@ def _get_current_user_from_token():
         raise InvalidTokenException('Invalid token.')
 
 def jwt_required(f):
+    """Decorator to protect routes that require a valid JWT token."""
     @wraps(f)
     def decorated_function(*args, **kwargs):
         user, _ = _get_current_user_from_token()
-        g.user = user
+        g.user = user # Attach user to the global `g` object for easy access in the route.
         return f(*args, **kwargs)
     return decorated_function
 
 def admin_required(f):
+    """Decorator to protect routes that require admin-level privileges."""
     @wraps(f)
     def decorated_function(*args, **kwargs):
         user, payload = _get_current_user_from_token()
