@@ -59,3 +59,7 @@ def create_loan(user: User, loan_data: LoanCreate):
 def get_user_loans(user_id: int):
     # Fetches all loans for a specific user.
     return loan_repo.find_by_user_id_with_details(user_id)
+
+def get_all_active_loans():
+    # Fetches all active loans with their related user and book details.
+    return loan_repo.find_all_active_with_details()

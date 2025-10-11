@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field
 from typing import Optional
 import datetime
+from .user_schemas import UserPublic
 
 class LoanCreate(BaseModel):
     book_id: int 
@@ -39,6 +40,17 @@ class LoanDetailsPublic(BaseModel):
     loan_date: datetime.datetime
     due_date: datetime.datetime
     return_date: Optional[datetime.datetime] = None
+    book_copy: BookCopyInLoan
+
+    class Config:
+        from_attributes = True
+
+
+class AdminLoanView(BaseModel):
+    id: int
+    loan_date: datetime.datetime
+    due_date: datetime.datetime
+    user: UserPublic
     book_copy: BookCopyInLoan
 
     class Config:

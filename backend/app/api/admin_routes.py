@@ -1,9 +1,10 @@
 from flask import Blueprint, request, jsonify
 from pydantic import ValidationError
 from app.core.security import admin_required
-from app.services import admin_service
+from app.services import admin_service ,loan_service
 from app.schemas.admin_schemas import BookCreate, BookUpdate
-from app.schemas.book_schemas import BookPublic  # For response serialization
+from app.schemas.book_schemas import BookPublic  
+from app.schemas.loan_schemas import AdminLoanView
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/api/admin')
 
@@ -58,3 +59,10 @@ def handle_delete_book_copy(copy_id):
         return jsonify({"error": "Book copy not found"}), 404
 
     return jsonify({"message": f"Book copy ID {copy_id} has been deleted."}), 200
+
+@admin_bp.route('/loans', methods=['GET'])
+@admin_required
+def handle_get_active_loans():
+    active_loans = loan_service.get_all_active_loans()
+    loans_data = [AdminLoanView.model_validate(loan).model_dump() for loan in active_loans]
+    return jsonify(loans_data)
