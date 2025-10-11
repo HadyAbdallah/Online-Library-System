@@ -3,38 +3,33 @@ from pydantic import ValidationError
 from app.core.security import admin_required
 from app.services import admin_service
 from app.schemas.admin_schemas import BookCreate, BookUpdate
-from app.schemas.book_schemas import BookPublic # For response serialization
+from app.schemas.book_schemas import BookPublic  # For response serialization
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/api/admin')
+
 
 @admin_bp.route('/books', methods=['POST'])
 @admin_required
 def handle_create_book():
-    try:
-        book_data = BookCreate(**request.form.to_dict())
-        image_file = request.files.get('image')
-        new_book = admin_service.create_book(book_data, image_file)
-        return jsonify(BookPublic.model_validate(new_book).model_dump()), 201
-    except ValidationError as e:
-        return jsonify(e.errors()), 400
-    except ValueError as e: 
-        return jsonify({"error": str(e)}), 409
+
+    book_data = BookCreate(**request.form.to_dict())
+    image_file = request.files.get('image')
+    new_book = admin_service.create_book(book_data, image_file)
+    return jsonify(BookPublic.model_validate(new_book).model_dump()), 201
+
 
 @admin_bp.route('/books/<int:book_id>', methods=['PUT'])
 @admin_required
 def handle_update_book(book_id):
-    try:
-        book_data = BookUpdate(**request.form.to_dict())
-        image_file = request.files.get('image')
 
-        updated_book = admin_service.update_book(book_id, book_data, image_file)
-        if not updated_book:
-            return jsonify({"error": "Book not found"}), 404
-        return jsonify(BookPublic.model_validate(updated_book).model_dump()), 200
-    except ValidationError as e:
-        return jsonify(e.errors()), 400
-    except ValueError as e:
-        return jsonify({"error": str(e)}), 409
+    book_data = BookUpdate(**request.form.to_dict())
+    image_file = request.files.get('image')
+
+    updated_book = admin_service.update_book(book_id, book_data, image_file)
+    if not updated_book:
+        return jsonify({"error": "Book not found"}), 404
+    return jsonify(BookPublic.model_validate(updated_book).model_dump()), 200
+
 
 @admin_bp.route('/books/<int:book_id>', methods=['DELETE'])
 @admin_required
@@ -44,6 +39,7 @@ def handle_delete_book(book_id):
         return jsonify({"error": "Book not found"}), 404
 
     return jsonify({"message": f"Book '{deleted_book.title}' has been deleted."}), 200
+
 
 @admin_bp.route('/books/<int:book_id>/copies', methods=['POST'])
 @admin_required
