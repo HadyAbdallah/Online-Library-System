@@ -1,10 +1,19 @@
-from app.extensions import db
 from app.models import Book, BookCopy, Category
 from app.schemas.admin_schemas import BookCreate, BookUpdate
 from app.core.redis_client import redis_client
 from sqlalchemy.exc import IntegrityError
 import datetime
 from app.core import file_handler 
+
+# Import repositories
+from app.repositories.book_repository import BookRepository
+from app.repositories.book_copy_repository import BookCopyRepository
+from app.repositories.category_repository import CategoryRepository
+
+# Instantiate them
+book_repo = BookRepository()
+book_copy_repo = BookCopyRepository()
+category_repo = CategoryRepository()
 
 def create_book(book_data: BookCreate, image_file=None):
     new_book = Book(
@@ -15,31 +24,31 @@ def create_book(book_data: BookCreate, image_file=None):
         description=book_data.description
     )
     if book_data.category_ids:
-        categories = Category.query.filter(Category.id.in_(book_data.category_ids)).all()
+        categories = category_repo.get_by_ids(book_data.category_ids)
         new_book.categories.extend(categories)
 
-    db.session.add(new_book)
+    book_repo.add(new_book)
     try:
-        db.session.commit()
+        book_repo.commit() 
     except IntegrityError:
-        db.session.rollback()
+        book_repo.rollback() 
         raise ValueError(f"A book with ISBN {book_data.isbn} already exists.")
 
     if image_file:
         image_url = file_handler.save_book_image(image_file)
         new_book.image_url = image_url
-        db.session.commit()
+        book_repo.commit() 
 
     return new_book
 
 def update_book(book_id: int, book_data: BookUpdate, image_file=None):
-    book = Book.query.get(book_id)
+    book = book_repo.get_by_id(book_id)
     if not book:
         return None
 
     for key, value in book_data.model_dump(exclude_unset=True).items():
         if key == "category_ids":
-            categories = Category.query.filter(Category.id.in_(value)).all()
+            categories = category_repo.get_by_ids(value)
             book.categories = categories
         else:
             setattr(book, key, value)
@@ -49,9 +58,9 @@ def update_book(book_id: int, book_data: BookUpdate, image_file=None):
         book.image_url = image_url
 
     try:
-        db.session.commit()
+        book_repo.commit() 
     except IntegrityError:
-        db.session.rollback()
+        book_repo.rollback() 
         raise ValueError(f"A book with the provided ISBN already exists.")
 
     # --- Cache Invalidation ---
@@ -63,22 +72,17 @@ def update_book(book_id: int, book_data: BookUpdate, image_file=None):
     return book
 
 def delete_book(book_id: int):
-    book = Book.query.get(book_id)
+    book = book_repo.get_by_id(book_id)
     if not book:
         return None
 
-    now = datetime.datetime.utcnow()
-
     # Soft delete the main book record
-    book.deleted_at = now
+    book.deleted_at = datetime.datetime.utcnow()
 
     # Find all active copies of this book and soft delete them too
-    BookCopy.query.filter(
-        BookCopy.book_id == book_id,
-        BookCopy.deleted_at.is_(None)
-    ).update({'deleted_at': now})
-
-    db.session.commit()
+    book_copy_repo.soft_delete_by_book_id(book_id)
+    
+    book_repo.commit()
 
     # Invalidate the cache for this specific book
     cache_key = f"book:{book_id}"
@@ -87,22 +91,22 @@ def delete_book(book_id: int):
     return book
 
 def add_book_copy(book_id: int):
-    book = Book.query.get(book_id)
+    book = book_repo.get_by_id(book_id)
     if not book:
         return None
 
     new_copy = BookCopy(book_id=book.id)
-    db.session.add(new_copy)
-    db.session.commit()
+    book_copy_repo.add(new_copy)
+    book_copy_repo.commit()
     return new_copy
 
 def delete_book_copy(copy_id: int):
-    copy = BookCopy.query.get(copy_id)
+    copy = book_copy_repo.get_by_id(copy_id)
     if not copy or copy.deleted_at is not None:
         return None
 
     copy.deleted_at = datetime.datetime.utcnow()
-    db.session.commit()
+    book_copy_repo.commit()
 
     # When a copy's status changes, the main book's detail
     # cache is now out of date. We should invalidate it.

@@ -1,10 +1,15 @@
-from app.extensions import db, bcrypt
+from app.extensions import bcrypt
 from app.models.user import User
 from app.schemas.auth_schemas import UserCreate
+from app.repositories.user_repository import UserRepository
+
+# Instantiate the repository
+user_repo = UserRepository()
 
 def register_user(user_data: UserCreate):
     # Check if user already exists
-    if User.query.filter((User.username == user_data.username) | (User.email == user_data.email)).first():
+    existing_user = user_repo.find_by_username_or_email(user_data.username, user_data.email)
+    if existing_user:
         raise ValueError("Username or email already exists.")
 
     hashed_password = bcrypt.generate_password_hash(user_data.password).decode('utf-8')
@@ -13,12 +18,14 @@ def register_user(user_data: UserCreate):
         email=user_data.email,
         password_hash=hashed_password
     )
-    db.session.add(new_user)
-    db.session.commit()
+    user_repo.add(new_user)
+    user_repo.commit()
     return new_user
 
 def authenticate_user(email: str, password: str) -> User | None:
-    user = User.query.filter_by(email=email).first()
+    user = user_repo.find_by_email(email)
+    
+    # Password checking is business logic, so it stays in the service
     if user and bcrypt.check_password_hash(user.password_hash, password):
         return user
     return None
