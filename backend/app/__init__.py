@@ -9,6 +9,7 @@ from .api.auth_routes import auth_bp
 from .api.book_routes import book_bp
 from .api.loan_routes import loan_bp
 from .api.admin_routes import admin_bp
+from .api.category_routes import category_bp
 
 
 from . import models
@@ -42,6 +43,7 @@ def create_app():
     app.register_blueprint(book_bp)
     app.register_blueprint(loan_bp)
     app.register_blueprint(admin_bp)
+    app.register_blueprint(category_bp)
 
     register_error_handlers(app)
 

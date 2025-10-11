@@ -8,3 +8,6 @@ class CategoryRepository(BaseRepository):
 
     def get_by_ids(self, category_ids: list):
         return db.session.query(self.model).filter(self.model.id.in_(category_ids)).all()
+
+    def get_all_active(self): 
+        return db.session.query(self.model).filter(self.model.deleted_at.is_(None)).all()
